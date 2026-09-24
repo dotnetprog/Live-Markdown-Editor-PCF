@@ -1112,6 +1112,122 @@
 }
 
 /* ========================================
+   DATAVERSE REFERENCE AUTOCOMPLETE
+   ======================================== */
+
+/* Container — positioned absolute inside .markdown-editor-container */
+.dv-autocomplete {
+    position: absolute;
+    z-index: 500;
+    min-width: 220px;
+    max-width: 400px;
+    background: var(--fluent-dropdown-bg);
+    border: 1px solid var(--fluent-border-default);
+    border-radius: var(--fluent-radius-medium);
+    box-shadow: var(--fluent-shadow-8);
+    font-family: var(--fluent-font-family);
+    font-size: var(--fluent-font-size-300);
+    overflow: hidden;
+    animation: dv-autocomplete-in var(--fluent-duration-fast) var(--fluent-easing-ease-in-out);
+}
+
+@keyframes dv-autocomplete-in {
+    from { opacity: 0; transform: translateY(-4px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Header row */
+.dv-autocomplete-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 10px 5px;
+    border-bottom: 1px solid var(--fluent-border-subtle);
+    background: var(--fluent-bg-tertiary);
+}
+
+.dv-autocomplete-header-text {
+    font-weight: var(--fluent-font-weight-semibold);
+    color: var(--fluent-fg-primary);
+    font-size: var(--fluent-font-size-200);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.dv-autocomplete-hint {
+    font-size: var(--fluent-font-size-100);
+    color: var(--fluent-fg-tertiary);
+    white-space: nowrap;
+}
+
+/* Loading / empty state */
+.dv-autocomplete-status {
+    padding: 10px 12px;
+    color: var(--fluent-fg-secondary);
+    font-size: var(--fluent-font-size-300);
+}
+
+/* Suggestion list */
+.dv-autocomplete-list {
+    list-style: none;
+    margin: 0;
+    padding: 4px 0;
+    max-height: 240px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+.dv-autocomplete-item {
+    padding: 6px 12px;
+    cursor: pointer;
+    color: var(--fluent-fg-primary);
+    font-family: var(--fluent-font-mono);
+    font-size: var(--fluent-font-size-300);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: background-color var(--fluent-duration-fast);
+}
+
+.dv-autocomplete-item:hover {
+    background: var(--fluent-bg-subtle);
+}
+
+.dv-autocomplete-item.selected {
+    background: var(--fluent-brand-primary);
+    color: var(--fluent-brand-foreground);
+}
+
+.dv-autocomplete-item.selected .dv-autocomplete-mark {
+    background: rgba(255, 255, 255, 0.35);
+    color: inherit;
+}
+
+/* Highlighted match portion */
+.dv-autocomplete-mark {
+    background: rgba(0, 120, 212, 0.15);
+    border-radius: 2px;
+    font-style: normal;
+}
+
+/* Dark-theme adjustments */
+.dark .dv-autocomplete {
+    border-color: var(--fluent-border-strong);
+}
+
+.dark .dv-autocomplete-item:hover {
+    background: var(--fluent-bg-subtle);
+}
+
+.dark .dv-autocomplete-item.selected {
+    background: var(--fluent-brand-primary);
+}
+
+.dark .dv-autocomplete-mark {
+    background: rgba(71, 158, 245, 0.2);
+}
+
+/* ========================================
    RESPONSIVE DESIGN
    ======================================== */
 

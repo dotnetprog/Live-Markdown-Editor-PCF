@@ -1,5 +1,10 @@
 import { Editor } from '@milkdown/core';
 
+export interface DataverseMetadataFetcher {
+    getEntityNames(): Promise<string[]>;
+    getAttributeNames(entityLogicalName: string): Promise<string[]>;
+}
+
 export interface MarkdownEditorProps {
     value: string;
     onChange: (value: string) => void;

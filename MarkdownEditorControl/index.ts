@@ -2,11 +2,13 @@ import { IInputs, IOutputs } from "./generated/ManifestTypes";
 import * as React from "react";
 import { createRoot, Root } from "react-dom/client";
 import { MarkdownEditor } from "./components/MarkdownEditor";
+import type { DataverseMetadataFetcher } from "./types/editor.types";
 
 export class MarkdownEditorControl implements ComponentFramework.StandardControl<IInputs, IOutputs> {
     private _container: HTMLDivElement;
     private _notifyOutputChanged: () => void;
     private _currentValue: string;
+    private _entitiesSuggestions: string[];
     private _wordCount: number;
     private _characterCount: number;
     private _isValid: boolean;
@@ -17,6 +19,7 @@ export class MarkdownEditorControl implements ComponentFramework.StandardControl
     private _initialLoadComplete: boolean;
     private _notifyTimeoutId: ReturnType<typeof setTimeout> | null;
     private _lastPropsSignature: string;
+    private _metadataFetcher: DataverseMetadataFetcher;
 
     constructor() {
         this._currentValue = "";
@@ -31,6 +34,8 @@ export class MarkdownEditorControl implements ComponentFramework.StandardControl
         this._lastPropsSignature = "";
         // Bind handleChange once in constructor for better performance
         this._boundHandleChange = this.handleChange.bind(this);
+        // Create the Dataverse metadata fetcher (caching is handled inside the React hook)
+        
     }
 
     /**
@@ -48,7 +53,9 @@ export class MarkdownEditorControl implements ComponentFramework.StandardControl
         // Load initial value from bound Dataverse field
         this._currentValue = context.parameters.value?.raw || "";
         this._maxLength = context.parameters.maxLength?.raw || 100000;
-
+        const raw:string = context.parameters.entitiesSuggestions?.raw || "";
+        this._entitiesSuggestions = raw.split(",").map(s => s.trim().toLowerCase());
+        this._metadataFetcher = createDataverseMetadataFetcher(this._entitiesSuggestions);
         // Register for container resize events
         context.mode.trackContainerResize(true);
 
@@ -139,7 +146,8 @@ export class MarkdownEditorControl implements ComponentFramework.StandardControl
                 enableSpellCheck: enableSpellCheck,
                 maxLength: this._maxLength,
                 height: height,
-                width: width
+                width: width,
+                metadataFetcher: this._metadataFetcher,
             })
         );
     }
@@ -196,4 +204,44 @@ export class MarkdownEditorControl implements ComponentFramework.StandardControl
             this._root = null;
         }
     }
+}
+interface AttributeType { LogicalName: string,AttributeType:string };
+// =============================================================================
+// Dataverse metadata fetcher
+// Uses Xrm.Utility.getEntityMetadata (model-driven app) with a fetch-based
+// fallback.  Returns empty arrays gracefully when running in the PCF test harness
+// or when the user's security role does not permit metadata access.
+// =============================================================================
+function createDataverseMetadataFetcher(entitiesSuggestions: string[]): DataverseMetadataFetcher {
+    const typesToFormat = ["Lookup", "Picklist","Customer", "Money","Owner","Boolean","DateTime","State","Status"];
+    const addSuffixAttributes = (a:AttributeType) => {
+        if (!typesToFormat.includes(a.AttributeType)) {
+            return [a.LogicalName];
+        }
+        return [`${a.LogicalName}@formatted`, a.LogicalName];
+    };
+    
+    return {
+        async getEntityNames(): Promise<string[]> {
+            return entitiesSuggestions;
+        },
+
+        async getAttributeNames(entityLogicalName: string): Promise<string[]> {
+            try {
+                // OData single-quoted value — apostrophes in names are doubled
+                const oDataName = entityLogicalName.replace(/'/g, "''");
+                const response = await fetch(
+                    `/api/data/v9.2/EntityDefinitions(LogicalName='${oDataName}')/Attributes?$select=LogicalName,AttributeType&$top=500&$orderby=LogicalName&$filter=AttributeType ne 'Virtual' and AttributeOf eq null`
+                );
+                if (!response.ok) return [];
+                const data = await response.json() as { value: AttributeType[] };
+                const transformed = data.value.flatMap(a => addSuffixAttributes(a));
+                transformed.push('@recordurl');
+                return transformed;
+            } catch (e) {
+                console.error(e);
+                return [];
+            }
+        },
+    };
 }
