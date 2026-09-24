@@ -6,3 +6,6 @@ export type { UseTableOperationsProps, TableOperations, NotificationType } from 
 
 export { useFindReplace } from './useFindReplace';
 export type { UseFindReplaceProps, FindReplaceActions } from './useFindReplace';
+
+export { useDataverseAutocomplete } from './useDataverseAutocomplete';
+export type { UseDataverseAutocompleteProps, UseDataverseAutocompleteReturn, AutocompleteState, AutocompletePosition } from './useDataverseAutocomplete';

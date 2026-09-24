@@ -1,0 +1,1 @@
+pac solution import --path Solution/bin/Debug/Solution.zip  -env https://pcflab.crm3.dynamics.com -f -pc

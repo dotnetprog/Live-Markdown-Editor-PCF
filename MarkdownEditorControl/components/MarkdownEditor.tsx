@@ -26,7 +26,9 @@ import {
 } from '../utils/constants';
 
 // Import custom hooks
-import { useEditorCommands, useTableOperations, useFindReplace } from '../hooks';
+import { useEditorCommands, useTableOperations, useFindReplace, useDataverseAutocomplete } from '../hooks';
+import { DataverseAutocomplete } from './DataverseAutocomplete';
+import type { DataverseMetadataFetcher } from '../types/editor.types';
 
 // Fluent UI Icons
 import {
@@ -91,6 +93,7 @@ export interface MarkdownEditorProps {
     maxLength?: number;
     height?: number; // Height in pixels for the editor container
     width?: number; // Width in pixels for responsive behavior
+    metadataFetcher?: DataverseMetadataFetcher;
 }
 
 type SaveStatus = 'saved' | 'saving' | 'unsaved';
@@ -106,7 +109,8 @@ const EditorComponent: React.FC<Omit<MarkdownEditorProps, 'value' | 'onChange'> 
     showToolbar = true,
     maxLength = 100000,
     height,
-    width
+    width,
+    metadataFetcher,
 }) => {
     // Use refs instead of state for stats to avoid re-renders on every keystroke
     const wordCountRef = useRef(0);
@@ -264,6 +268,15 @@ const EditorComponent: React.FC<Omit<MarkdownEditorProps, 'value' | 'onChange'> 
         currentMarkdown: currentMarkdownRef,
         containerRef
     });
+
+    // Dataverse reference autocomplete (#entityLogicalName.attributeLogicalName#)
+    const {
+        state: autocompleteState,
+        checkTrigger,
+        handleKeyDown: acHandleKeyDown,
+        selectSuggestion,
+        close: closeAutocomplete,
+    } = useDataverseAutocomplete({ getEditor, containerRef, metadataFetcher });
 
     // Sync editor content when initialValue prop changes (handles late-arriving Dataverse data)
     // Only updates if editor is empty and new value has content
@@ -884,6 +897,38 @@ ${html}
         return () => container.removeEventListener('paste', handlePaste, true);
     }, [handlePaste]);
 
+    // Autocomplete: keyboard navigation (capture phase — must run before ProseMirror)
+    useEffect(() => {
+        const container = containerRef.current;
+        if (!container) return;
+
+        const onKeyDown = (e: KeyboardEvent) => {
+            if (acHandleKeyDown(e)) {
+                e.preventDefault();
+                e.stopPropagation();
+                // After Enter/Tab selection: re-check trigger so attribute mode activates
+                requestAnimationFrame(() => checkTrigger());
+            }
+        };
+
+        container.addEventListener('keydown', onKeyDown, true);
+        return () => container.removeEventListener('keydown', onKeyDown, true);
+    }, [acHandleKeyDown, checkTrigger]);
+
+    // Autocomplete: update suggestions after every editor input
+    useEffect(() => {
+        const container = containerRef.current;
+        if (!container) return;
+
+        const onInput = () => {
+            // Defer so ProseMirror has applied its transaction first
+            requestAnimationFrame(() => checkTrigger());
+        };
+
+        container.addEventListener('input', onInput, true);
+        return () => container.removeEventListener('input', onInput, true);
+    }, [checkTrigger]);
+
     // Determine responsive class based on width
     const getResponsiveClass = () => {
         if (!width) return '';
@@ -1342,6 +1387,17 @@ ${html}
                     </div>
                 )}
             </div>
+
+            {/* Dataverse reference autocomplete dropdown */}
+            <DataverseAutocomplete
+                state={autocompleteState}
+                onSelect={(suggestion) => {
+                    selectSuggestion(suggestion);
+                    requestAnimationFrame(() => checkTrigger());
+                }}
+                onClose={closeAutocomplete}
+                theme={effectiveTheme}
+            />
         </div>
     );
 };
@@ -1360,6 +1416,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = React.memo((props) 
                 maxLength={props.maxLength}
                 height={props.height}
                 width={props.width}
+                metadataFetcher={props.metadataFetcher}
             />
         </MilkdownProvider>
     );
@@ -1373,7 +1430,8 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = React.memo((props) 
         prev.enableSpellCheck === next.enableSpellCheck &&
         prev.maxLength === next.maxLength &&
         prev.height === next.height &&
-        prev.width === next.width
+        prev.width === next.width &&
+        prev.metadataFetcher === next.metadataFetcher
         // onChange is bound once in PCF constructor, always same reference
     );
 });
